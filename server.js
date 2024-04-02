@@ -1,27 +1,29 @@
 import express from "express";
 import cors from "cors";
-import mysql from "mysql";
+import mysql2 from 'mysql2'
 
 const app = express();
 app.use(express.json());
 app.use(cors({
-  origin : ['http://localhost:8081'],
+  origin : ['http://localhost:5800'],
   methods : ["POST", "GET", "PUT", "DELETE"],
   credentials : true
 }));
-const port = 8081;
+const port = 5800;
 
-const db = mysql.createConnection({
+const db = mysql2.createConnection({
   host: "localhost",
   user: "root",
-  password: "",
+  password: "mysqldb123$",
   database: "serfix"
 });
 
 app.get("/user", (req,res) => {
   const sql = "SELECT * FROM user";
   db.query(sql, (err,data) => {
-      if(err) return res.json("Err");
+      if(err) {
+        console.log(err)
+      };
       res.status(200).json({ status: "success", data})
   })
 })
