@@ -1,6 +1,10 @@
 import express from "express";
 import cors from "cors";
 import mysql from "mysql";
+import moment from 'moment';
+import bcryptjs from 'bcryptjs';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 const app = express();
 app.use(express.json());
@@ -26,6 +30,53 @@ app.get("/user", (req,res) => {
   })
 })
 
+const verifyUser = (req, res, next) => {
+  const token = req.cookies.token;
+  if(!token) {
+      return res.json({Error: "You are not Auth"});
+  } else {
+      jwt.verify(token, "jwtsecretkeyadmin", (err, decoded) => {
+          if (err) {
+              return res.json({Error: "Token is not correct"});
+          } else {
+              req.name = decoded.name;
+              next();
+          }
+      })
+  }
+}
+
+app.post('/login', (req, res) => {
+  const sql = "SELECT * FROM user WHERE username = ?";
+  db.query(sql, [req.body.user], async (err, data) => {
+      if (err) {
+          return res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+      }
+
+      if (data.length > 0) {
+          const storedPassword = data[0].password;
+
+          try {
+              const passwordMatch = await bcrypt.compare(req.body.password, storedPassword);
+          
+              if (passwordMatch) {
+                  const name = data[0].username;
+                  const token = jwt.sign({name}, "jwtsecretkeyadmin", {expiresIn : '1d'});
+                  res.cookie('token', token);
+                  return res.json({ status: 'success', message: 'Login Berhasil' });
+              } else {
+                  return res.status(401).json({ status: 'error', message: 'Password Salah' });
+              }
+          } catch (error) {
+              console.error('Error comparing passwords:', error);
+              return res.status(401).json({ status: 'error', message: 'Password Comparison Error' });
+          }
+      } else {
+          return res.status(401).json({ status: 'error', message: 'Akun tidak Terdaftar' });
+      }
+  });
+});
+
 app.get("/data/laptop/services", (req,res) => {
   const sql = "SELECT * FROM laptop_service";
   db.query(sql, (err,data) => {
@@ -33,6 +84,36 @@ app.get("/data/laptop/services", (req,res) => {
       res.status(200).json({ status: "success", data})
   })
 })
+
+app.post("/user", async (req, res) => {
+  try {
+      // Generate salt and hash asynchronously
+      const salt = await bcryptjs.genSalt(12);
+      const hash = await bcryptjs.hash(req.body.password, salt);
+
+      // SQL query with placeholders
+      const sql = "INSERT INTO user (`username`, `password`, `birth_date`, `email`, `phone_number`, `gender`) VALUES (?)";
+
+      // Values for the placeholders
+      const values = [
+        req.body.username,
+        hash,
+        req.body.birth,
+        req.body.email,
+        req.body.phone,
+        req.body.gender,
+    ]
+
+      // Execute the query
+      db.query(sql, [values], (err, data) => {
+        if(err) return res.json("Error");
+        res.status(200).json({ status: "success", data: req.body })
+    })
+  } catch (error) {
+      console.error(error);
+      res.json("Error");
+  }
+});
 
 app.post("/user", (req,res) => {
   const sql = "INSERT INTO user (`username`, `password`, `birth_date`, `email`, `phone_number`, `gender`) VALUES (?)";
