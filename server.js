@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import mysql from "mysql";
+import mysql2 from "mysql2";
 import moment from 'moment';
 import bcryptjs from 'bcryptjs';
 import bcrypt from 'bcrypt';
@@ -15,7 +15,7 @@ app.use(cors({
 }));
 const port = 8081;
 
-const db = mysql.createConnection({
+const db = mysql2.createConnection({
   host: "localhost",
   user: "root",
   password: "",
