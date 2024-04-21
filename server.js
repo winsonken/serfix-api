@@ -55,6 +55,14 @@ app.post('/login', (req, res) => {
 
       if (data.length > 0) {
           const storedPassword = data[0].password;
+          const userData = {
+            name : data[0].username,
+            birth: data[0].birth_date,
+            email: data[0].email,
+            phone: data[0].phone_number,
+            gender: data[0].gender
+          };
+
 
           try {
               const passwordMatch = await bcrypt.compare(req.body.password, storedPassword);
@@ -63,7 +71,7 @@ app.post('/login', (req, res) => {
                   const name = data[0].username;
                   const token = jwt.sign({name}, "jwtsecretkeyadmin", {expiresIn : '1d'});
                   res.cookie('token', token);
-                  return res.json({ status: 'success', message: 'Login Berhasil' });
+                  return res.json({ status: 'success', message: 'Login Berhasil', token, userData});
               } else {
                   return res.status(401).json({ status: 'error', message: 'Password Salah' });
               }
