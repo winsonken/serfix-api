@@ -57,10 +57,8 @@ app.post('/login', (req, res) => {
           const storedPassword = data[0].password;
           const userData = {
             name : data[0].username,
-            birth: data[0].birth_date,
             email: data[0].email,
-            phone: data[0].phone_number,
-            gender: data[0].gender
+            phone: data[0].phone_number
           };
 
 
@@ -100,16 +98,14 @@ app.post("/user", async (req, res) => {
       const hash = await bcryptjs.hash(req.body.password, salt);
 
       // SQL query with placeholders
-      const sql = "INSERT INTO user (`username`, `password`, `birth_date`, `email`, `phone_number`, `gender`) VALUES (?)";
+      const sql = "INSERT INTO user (`username`, `password`, `email`, `phone_number`) VALUES (?)";
 
       // Values for the placeholders
       const values = [
         req.body.username,
         hash,
-        req.body.birth,
         req.body.email,
         req.body.phone,
-        req.body.gender,
     ]
 
       // Execute the query
@@ -124,14 +120,12 @@ app.post("/user", async (req, res) => {
 });
 
 app.post("/user", (req,res) => {
-  const sql = "INSERT INTO user (`username`, `password`, `birth_date`, `email`, `phone_number`, `gender`) VALUES (?)";
+  const sql = "INSERT INTO user (`username`, `password`, `email`, `phone_number`) VALUES (?)";
   const values = [
       req.body.username,
       req.body.password,
-      req.body.birth,
       req.body.email,
       req.body.phone,
-      req.body.gender,
   ]
   db.query(sql, [values], (err, data) => {
       if(err) return res.json("Error");
@@ -175,14 +169,12 @@ app.delete("/deletelaptopservice/:id", (req,res) => {
 })
 
 app.put("/user/:id", (req,res) => {
-  const sql = "UPDATE user SET `username` = ?, `password` = ?, `birth_date` = ?, `email` = ?, `phone_number` = ?, `gender` = ? WHERE ID = ?";
+  const sql = "UPDATE user SET `username` = ?, `password` = ?, `email` = ?, `phone_number` = ? WHERE ID = ?";
   const values = [
       req.body.username,
       req.body.password,
-      req.body.birth,
       req.body.email,
       req.body.phone,
-      req.body.gender,
   ]
   const id = req.params.id;
 
