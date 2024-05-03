@@ -8,12 +8,8 @@ import jwt from 'jsonwebtoken';
 
 const app = express();
 app.use(express.json());
-app.use(cors({
-  origin : ['http://localhost:8081'],
-  methods : ["POST", "GET", "PUT", "DELETE"],
-  credentials : true
-}));
-const port = 8081;
+app.use(cors()); // Enable CORS for all routes
+const port = 8082;
 
 const db = mysql2.createConnection({
   host: "localhost",
@@ -30,24 +26,25 @@ app.get("/user", (req,res) => {
   })
 })
 
-const verifyUser = (req, res, next) => {
-  const token = req.cookies.token;
-  if(!token) {
-      return res.json({Error: "You are not Auth"});
-  } else {
-      jwt.verify(token, "jwtsecretkeyadmin", (err, decoded) => {
-          if (err) {
-              return res.json({Error: "Token is not correct"});
-          } else {
-              req.name = decoded.name;
-              next();
-          }
-      })
-  }
-}
+// const verifyUser = (req, res, next) => {
+//   const token = req.cookies.token;
+//   if(!token) {
+//       return res.json({Error: "You are not Auth"});
+//   } else {
+//       jwt.verify(token, "jwtsecretkeyadmin", (err, decoded) => {
+//           if (err) {
+//               return res.json({Error: "Token is not correct"});
+//           } else {
+//               req.name = decoded.name;
+//               next();
+//           }
+//       })
+//   }
+// }
 
-app.post('/login', (req, res) => {
-  const sql = "SELECT * FROM user WHERE username = ?";
+
+app.post('/LoginScreen', (req, res) => {
+  const sql = "SELECT * FROM user WHERE email = ?";
   db.query(sql, [req.body.user], async (err, data) => {
       if (err) {
           return res.status(500).json({ status: 'error', message: 'Internal Server Error' });
@@ -55,21 +52,17 @@ app.post('/login', (req, res) => {
 
       if (data.length > 0) {
           const storedPassword = data[0].password;
-          const userData = {
-            name : data[0].username,
-            email: data[0].email,
-            phone: data[0].phone_number
-          };
-
 
           try {
               const passwordMatch = await bcrypt.compare(req.body.password, storedPassword);
           
               if (passwordMatch) {
+                  const email = data[0].email;
                   const name = data[0].username;
-                  const token = jwt.sign({name}, "jwtsecretkeyadmin", {expiresIn : '1d'});
+                  const phone = data[0].phone_number;
+                  const token = jwt.sign({email}, "jwtsecretkeyadmin", {expiresIn : '1d'});
                   res.cookie('token', token);
-                  return res.json({ status: 'success', message: 'Login Berhasil', token, userData});
+                  return res.json({ status: 'success', message: 'Login Berhasil', token, email, name, phone});
               } else {
                   return res.status(401).json({ status: 'error', message: 'Password Salah' });
               }
@@ -84,14 +77,184 @@ app.post('/login', (req, res) => {
 });
 
 app.get("/data/laptop/services", (req,res) => {
-  const sql = "SELECT * FROM laptop_service";
+  const sql = "SELECT * FROM category WHERE type = laptop";
   db.query(sql, (err,data) => {
       if(err) return res.json("Err");
       res.status(200).json({ status: "success", data})
   })
 })
 
-app.post("/user", async (req, res) => {
+app.post("/data/laptop/services", (req,res) => {
+  const sql = "INSERT INTO service (`device_name`, `category`,`store`,`notes`,`status`) VALUES (?)";
+  const status = 1
+  const values = [
+      req.body.device,
+      req.body.category1,
+      req.body.location,
+      req.body.notes,
+      status
+  ]
+  db.query(sql, [values], (err, data) => {
+      if(err) return res.json("Error");
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.put("/data/laptop/services/:id", (req,res) => {
+  const sql = "UPDATE services SET `device_name` = ?, `category` = ?, `store` = ?, `price` = ?, `notes` = ?, 'status' = ? WHERE ID = ?";
+  const values = [
+      req.body.name,
+      req.body.category,
+      req.body.store,
+      req.body.price,
+      req.body.notes,
+      req.body.status,
+  ]
+  const id = req.params.id;
+
+  db.query(sql, [...values, id], (err, data) => {
+      if (err) {
+          console.error(err); // Log the error for debugging 
+          return res.status(500).json({ error: "Internal Server Error" });
+      }
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.get("/data/phone/services", (req,res) => {
+  const sql = "SELECT * FROM category WHERE type = phone";
+  db.query(sql, (err,data) => {
+      if(err) return res.json("Err");
+      res.status(200).json({ status: "success", data})
+  })
+})
+
+app.post("/data/phone/services", (req,res) => {
+  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`) VALUES (?)";
+  const status = "1" 
+  const values = [
+      req.body.name,
+      req.body.category,
+      req.body.store,
+      req.body.price,
+      req.body.notes,
+      status
+  ]
+  db.query(sql, [values], (err, data) => {
+      if(err) return res.json("Error");
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.put("/data/phone/services/:id", (req,res) => {
+  const sql = "UPDATE services SET `device_name` = ?, `category` = ?, `store` = ?, `price` = ?, `notes` = ?, 'status' = ? WHERE ID = ?";
+  const values = [
+      req.body.name,
+      req.body.category,
+      req.body.store,
+      req.body.price,
+      req.body.notes,
+      req.body.status,
+  ]
+  const id = req.params.id;
+
+  db.query(sql, [...values, id], (err, data) => {
+      if (err) {
+          console.error(err); // Log the error for debugging 
+          return res.status(500).json({ error: "Internal Server Error" });
+      }
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.get("/data/pc/services", (req,res) => {
+  const sql = "SELECT * FROM category WHERE type = pc";
+  db.query(sql, (err,data) => {
+      if(err) return res.json("Err");
+      res.status(200).json({ status: "success", data})
+  })
+})
+
+app.post("/data/pc/services", (req,res) => {
+  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`) VALUES (?)";
+  const status = "1" 
+  const values = [
+      req.body.name,
+      req.body.category,
+      req.body.store,
+      req.body.price,
+      req.body.notes,
+      status
+  ]
+  db.query(sql, [values], (err, data) => {
+      if(err) return res.json("Error");
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.put("/data/pc/services/:id", (req,res) => {
+  const sql = "UPDATE services SET `device_name` = ?, `category` = ?, `store` = ?, `price` = ?, `notes` = ?, 'status' = ? WHERE ID = ?";
+  const values = [
+      req.body.name,
+      req.body.category,
+      req.body.store,
+      req.body.price,
+      req.body.notes,
+      req.body.status,
+  ]
+  const id = req.params.id;
+
+  db.query(sql, [...values, id], (err, data) => {
+      if (err) {
+          console.error(err); // Log the error for debugging 
+          return res.status(500).json({ error: "Internal Server Error" });
+      }
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.delete("/deleteorder/:id", (req,res) => {
+  const sql = "DELETE FROM services WHERE id = ?";
+  const id = req.params.id;
+
+  db.query(sql, [id], (err, data) => {
+      if(err) return res.json("Error");
+      res.status(200).json({ success : "Data yang telah anda pilih telah berhasil dihapus"})
+  })
+})
+
+app.post("/helpcenter/reportbug", (req,res) => {
+  const sql = "INSERT INTO reportbug (`bug_type`, `description`) VALUES (?)"; 
+  const values = [
+      req.body.bug,
+      req.body.desc,
+  ]
+  db.query(sql, [values], (err, data) => {
+      if(err) return res.json("Error");
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.post("/feedback", (req,res) => {
+  const sql = "INSERT INTO feedback (`feedback`) VALUES (?)"; 
+  const values = [
+      req.body.feedback,
+  ]
+  db.query(sql, [values], (err, data) => {
+      if(err) return res.json("Error");
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.get("/track", (req,res) => {
+  const sql = "SELECT * FROM service WHERE type = pc";
+  db.query(sql, (err,data) => {
+      if(err) return res.json("Err");
+      res.status(200).json({ status: "success", data})
+  })
+})
+
+app.post("/register", async (req, res) => {
   try {
       // Generate salt and hash asynchronously
       const salt = await bcryptjs.genSalt(12);
@@ -205,6 +368,11 @@ app.put("/data/laptop/services/:id", (req,res) => {
       }
       res.status(200).json({ status: "success", data: req.body })
   })
+})
+
+app.get('/logout', (req, res) => {
+  res.clearCookie('token');
+  return res.json({status: "Success"});
 })
 
 app.listen(port, () => {
