@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken';
 const app = express();
 app.use(express.json());
 app.use(cors()); // Enable CORS for all routes
-const port = 8082;
+const port = 8081;
 
 const db = mysql2.createConnection({
   host: "localhost",
@@ -57,12 +57,13 @@ app.post('/LoginScreen', (req, res) => {
               const passwordMatch = await bcrypt.compare(req.body.password, storedPassword);
           
               if (passwordMatch) {
+                  const id = data[0].id;
                   const email = data[0].email;
                   const name = data[0].username;
                   const phone = data[0].phone_number;
                   const token = jwt.sign({email}, "jwtsecretkeyadmin", {expiresIn : '1d'});
                   res.cookie('token', token);
-                  return res.json({ status: 'success', message: 'Login Berhasil', token, email, name, phone});
+                  return res.json({ status: 'success', message: 'Login Berhasil', id, token, email, name, phone});
               } else {
                   return res.status(401).json({ status: 'error', message: 'Password Salah' });
               }
@@ -76,23 +77,131 @@ app.post('/LoginScreen', (req, res) => {
   });
 });
 
-app.get("/data/laptop/services", (req,res) => {
-  const sql = "SELECT * FROM category WHERE type = laptop";
-  db.query(sql, (err,data) => {
-      if(err) return res.json("Err");
-      res.status(200).json({ status: "success", data})
+app.get("/admin-page/:status", (req, res) => {
+  const status = req.params.status;
+  const sql = "SELECT * FROM service WHERE status = ?";
+  db.query(sql, [status], (err, data) => {
+    if (err) {
+      console.error("Error fetching service data:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    
+    if (data.length === 0) {
+      // No data found for the specified status
+      return res.status(404).json({ error: "No data found for the specified status" });
+    }
+    const id = data[0].id;
+    const device = data[0].device_name;
+    const price = data[0].price;
+    const status = data[0].status;
+    const start_date = data[0].start_date;
+    const finish = data[0].finish_date;
+    const category = data[0].category;
+    const store = data[0].store;
+    const type = data[0].type;
+    const username = data[0].iduser;
+
+    res.status(200).json({ status: "success", data, id, device, price, status, start_date, finish, category, store, type, username});
+  });
+});
+
+app.put("/admin-page-ongoing/:id", (req,res) => {
+  const id = req.params.id;
+  const sql = "UPDATE service SET `status` = 3 WHERE id = ?";
+
+  db.query(sql, [id], (err, data) => {
+      if (err) {
+          console.error(err); // Log the error for debugging 
+          return res.status(500).json({ error: "Internal Server Error" });
+      }
+      console.log(id)
+      res.status(200).json({ status: "success", data: req.body })
   })
 })
 
+app.put("/admin-page-accept/:id", (req,res) => {
+  const id = req.params.id;
+  const sql = "UPDATE service SET `status` = 2 WHERE id = ?";
+
+  db.query(sql, [id], (err, data) => {
+      if (err) {
+          console.error(err); // Log the error for debugging 
+          return res.status(500).json({ error: "Internal Server Error" });
+      }
+      console.log(id)
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.put("/admin-page-reject/:id", (req,res) => {
+  const id = req.params.id;
+  const sql = "UPDATE service SET `status` = 4 WHERE id = ?";
+
+  db.query(sql, [id], (err, data) => {
+      if (err) {
+          console.error(err); // Log the error for debugging 
+          return res.status(500).json({ error: "Internal Server Error" });
+      }
+      console.log(id)
+      res.status(200).json({ status: "success", data: req.body })
+  })
+})
+
+app.get("/data/laptop/categories", (req, res) => {
+  const sql = "SELECT * FROM category WHERE type = 'laptop'";
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error("Error fetching laptop categories:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.status(200).json({ status: "success", data });
+  });
+});
+
+app.get("/data/laptop/location", (req, res) => {
+  const category = req.query.category; // Get the category from the query parameters
+  const sql = "SELECT * FROM location WHERE type = 'laptop' AND category = ?";
+  db.query(sql, [category], (err, data) => {
+    if (err) {
+      console.error("Error fetching laptop location:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.status(200).json({ status: "success", data });
+  });
+});
+
+app.get("/data/laptop/price", (req, res) => {
+  const { category, location } = req.query;
+  const sql = "SELECT price FROM location WHERE category = ? AND name = ? AND type = 'Laptop'";
+  db.query(sql, [category, location], (err, data) => {
+    if (err) {
+      console.error("Error fetching price:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    if (data.length === 0) {
+      return res.status(404).json({ error: "Price not found" });
+    }
+    res.status(200).json({ status: "success", data: data[0] }); // Assuming there's only one price for a specific category and location
+  });
+});
+
 app.post("/data/laptop/services", (req,res) => {
-  const sql = "INSERT INTO service (`device_name`, `category`,`store`,`notes`,`status`) VALUES (?)";
+  const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`, `type`, `user`, `iduser`, `start_date`) VALUES (?)";
   const status = 1
+  const type = "laptop"
   const values = [
       req.body.device,
       req.body.category1,
-      req.body.location,
+      req.body.selectedLocation,
+      req.body.price,
       req.body.notes,
-      status
+      status,
+      type,
+      req.body.id,
+      req.body.username,
+      currentDate,
+
   ]
   db.query(sql, [values], (err, data) => {
       if(err) return res.json("Error");
@@ -121,24 +230,60 @@ app.put("/data/laptop/services/:id", (req,res) => {
   })
 })
 
-app.get("/data/phone/services", (req,res) => {
-  const sql = "SELECT * FROM category WHERE type = phone";
-  db.query(sql, (err,data) => {
-      if(err) return res.json("Err");
-      res.status(200).json({ status: "success", data})
-  })
-})
+app.get("/data/phone/categories", (req, res) => {
+  const sql = "SELECT * FROM category WHERE type = 'phone'";
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error("Error fetching laptop categories:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.status(200).json({ status: "success", data });
+  });
+});
+
+app.get("/data/phone/location", (req, res) => {
+  const category = req.query.category; // Get the category from the query parameters
+  const sql = "SELECT * FROM location WHERE type = 'phone' AND category = ?";
+  db.query(sql, [category], (err, data) => {
+    if (err) {
+      console.error("Error fetching phone location:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.status(200).json({ status: "success", data });
+  });
+});
+
+app.get("/data/phone/price", (req, res) => {
+  const { category, location } = req.query;
+  const sql = "SELECT price FROM location WHERE category = ? AND name = ? AND type = 'Phone'";
+  db.query(sql, [category, location], (err, data) => {
+    if (err) {
+      console.error("Error fetching price:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    if (data.length === 0) {
+      return res.status(404).json({ error: "Price not found" });
+    }
+    res.status(200).json({ status: "success", data: data[0] }); // Assuming there's only one price for a specific category and location
+  });
+});
 
 app.post("/data/phone/services", (req,res) => {
-  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`) VALUES (?)";
-  const status = "1" 
+  const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`, `type`, `user`, `iduser`, `start_date`) VALUES (?)";
+  const status = 1
+  const type = "phone"
   const values = [
-      req.body.name,
-      req.body.category,
-      req.body.store,
-      req.body.price,
-      req.body.notes,
-      status
+    req.body.device,
+    req.body.category1,
+    req.body.selectedLocation,
+    req.body.price,
+    req.body.notes,
+    status,
+    type,
+    req.body.id,
+    req.body.username,
+    currentDate,
   ]
   db.query(sql, [values], (err, data) => {
       if(err) return res.json("Error");
@@ -167,24 +312,60 @@ app.put("/data/phone/services/:id", (req,res) => {
   })
 })
 
-app.get("/data/pc/services", (req,res) => {
-  const sql = "SELECT * FROM category WHERE type = pc";
-  db.query(sql, (err,data) => {
-      if(err) return res.json("Err");
-      res.status(200).json({ status: "success", data})
-  })
-})
+app.get("/data/pc/categories", (req, res) => {
+  const sql = "SELECT * FROM category WHERE type = 'PC'";
+  db.query(sql, (err, data) => {
+    if (err) {
+      console.error("Error fetching laptop categories:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.status(200).json({ status: "success", data });
+  });
+});
+
+app.get("/data/pc/location", (req, res) => {
+  const category = req.query.category; // Get the category from the query parameters
+  const sql = "SELECT * FROM location WHERE type = 'PC' AND category = ?";
+  db.query(sql, [category], (err, data) => {
+    if (err) {
+      console.error("Error fetching laptop location:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    res.status(200).json({ status: "success", data });
+  });
+});
+
+app.get("/data/pc/price", (req, res) => {
+  const { category, location } = req.query;
+  const sql = "SELECT price FROM location WHERE category = ? AND name = ? AND type = 'PC'";
+  db.query(sql, [category, location], (err, data) => {
+    if (err) {
+      console.error("Error fetching price:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    if (data.length === 0) {
+      return res.status(404).json({ error: "Price not found" });
+    }
+    res.status(200).json({ status: "success", data: data[0] }); // Assuming there's only one price for a specific category and location
+  });
+});
 
 app.post("/data/pc/services", (req,res) => {
-  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`) VALUES (?)";
-  const status = "1" 
+  const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`, `type`, `user`, `iduser`, `start_date`) VALUES (?)";
+  const status = 1
+  const type = "PC"
   const values = [
-      req.body.name,
-      req.body.category,
-      req.body.store,
-      req.body.price,
-      req.body.notes,
-      status
+    req.body.device,
+    req.body.category1,
+    req.body.selectedLocation,
+    req.body.price,
+    req.body.notes,
+    status,
+    type,
+    req.body.id,
+    req.body.username,
+    currentDate,
   ]
   db.query(sql, [values], (err, data) => {
       if(err) return res.json("Error");
@@ -246,11 +427,36 @@ app.post("/feedback", (req,res) => {
   })
 })
 
-app.get("/track", (req,res) => {
-  const sql = "SELECT * FROM service WHERE type = pc";
-  db.query(sql, (err,data) => {
+app.get("/track/:id", (req,res) => {
+  const sql = "SELECT * FROM service WHERE user = id";
+  const id = req.params.id;
+  const device = data[0].device_name;
+  const category = data[0].category;
+  const status = data[0].status;
+  const price = data[0].price;
+  const store = data[0].store;
+  const start_date = data[0].start_date;
+  const type = data[0].type;
+  db.query(sql, [id], (err,data) => {
       if(err) return res.json("Err");
-      res.status(200).json({ status: "success", data})
+      res.status(200).json({ status: "success", data, device, category, status, price, store, start_date, type})
+  })
+})
+
+app.get("/history/:id", (req,res) => {
+  const sql = "SELECT * FROM service WHERE user = id";
+  const id = req.params.id;
+  const device = data[0].device_name;
+  const price = data[0].price;
+  const status = data[0].status;
+  const start_date = data[0].start_date;
+  const finish = data[0].finish_date;
+  const category = data[0].category;
+  const store = data[0].store;
+  const type = data[0].type;
+  db.query(sql, [id], (err,data) => {
+      if(err) return res.json("Err");
+      res.status(200).json({ status: "success", data, device, price, status, start_date, finish, category, store, type})
   })
 })
 
@@ -296,33 +502,8 @@ app.post("/user", (req,res) => {
   })
 })
 
-app.post("/laptop/services", (req,res) => {
-  const sql = "INSERT INTO laptop_service (`device`, `category`, `location`, `price`, `notes`) VALUES (?)";
-  const values = [
-      req.body.device,
-      req.body.category,
-      req.body.location,
-      req.body.price,
-      req.body.notes,
-  ]
-  db.query(sql, [values], (err, data) => {
-      if(err) return res.json("Error");
-      res.status(200).json({ status: "success", data: req.body })
-  })
-})
-
 app.delete("/deleteuser/:id", (req,res) => {
   const sql = "DELETE FROM user WHERE id = ?";
-  const id = req.params.id;
-
-  db.query(sql, [id], (err, data) => {
-      if(err) return res.json("Error");
-      res.status(200).json({ success : "Data yang telah anda pilih telah berhasil dihapus"})
-  })
-})
-
-app.delete("/deletelaptopservice/:id", (req,res) => {
-  const sql = "DELETE FROM laptop_service WHERE id = ?";
   const id = req.params.id;
 
   db.query(sql, [id], (err, data) => {
