@@ -5,17 +5,53 @@ import moment from 'moment';
 import bcryptjs from 'bcryptjs';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import path from 'path';
+import bodyParser from 'body-parser';
 
 const app = express();
 app.use(express.json());
 app.use(cors()); // Enable CORS for all routes
-const port = 8081;
+app.use(bodyParser.json());
+const PORT = process.env.PORT || 8082;
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+      cb(null, 'uploads/');
+  },
+  filename: function (req, file, cb) {
+      cb(null, file.originalname);
+  }
+});
+
+const upload = multer({ storage: storage });
+
 
 const db = mysql2.createConnection({
   host: "localhost",
   user: "root",
   password: "",
   database: "serfix"
+});
+
+app.post('/uploadbukti', upload.single('image'), (req, res) => {
+  console.log("Received a request to /uploadbukti");
+  console.log("File info:", req.file);
+
+  if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+  }
+
+  const image = req.file.filename;
+  const sql = "INSERT INTO bukti (image) VALUES (?)";
+  db.query(sql, [image], (err, result) => {
+      if (err) {
+          console.error("Error inserting image:", err);
+          return res.status(500).json({ error: "Error inserting image" });
+      }
+      console.log("Image inserted successfully:", result);
+      return res.status(200).json({ status: "Success" });
+  });
 });
 
 app.get("/user", (req,res) => {
@@ -189,7 +225,7 @@ app.post("/data/laptop/services", (req,res) => {
   const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ");
   const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`, `type`, `user`, `iduser`, `start_date`) VALUES (?)";
   const status = 1
-  const type = "laptop"
+  const type = "Laptop"
   const values = [
       req.body.device,
       req.body.category1,
@@ -203,9 +239,10 @@ app.post("/data/laptop/services", (req,res) => {
       currentDate,
 
   ]
-  db.query(sql, [values], (err, data) => {
+  db.query(sql, [values], (err, result) => {
       if(err) return res.json("Error");
-      res.status(200).json({ status: "success", data: req.body })
+      const newServiceId = result.insertId;
+      res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
   })
 })
 
@@ -272,7 +309,7 @@ app.post("/data/phone/services", (req,res) => {
   const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ");
   const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`, `type`, `user`, `iduser`, `start_date`) VALUES (?)";
   const status = 1
-  const type = "phone"
+  const type = "Phone"
   const values = [
     req.body.device,
     req.body.category1,
@@ -285,10 +322,14 @@ app.post("/data/phone/services", (req,res) => {
     req.body.username,
     currentDate,
   ]
-  db.query(sql, [values], (err, data) => {
-      if(err) return res.json("Error");
-      res.status(200).json({ status: "success", data: req.body })
-  })
+  db.query(sql, [values], (err, result) => {
+    if(err) return res.json("Error");
+    const newServiceId = result.insertId;
+    const price1 = result.price;
+    const category1 = result.category1;
+    const type1 = result.type;
+    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
+})
 })
 
 app.put("/data/phone/services/:id", (req,res) => {
@@ -367,10 +408,11 @@ app.post("/data/pc/services", (req,res) => {
     req.body.username,
     currentDate,
   ]
-  db.query(sql, [values], (err, data) => {
-      if(err) return res.json("Error");
-      res.status(200).json({ status: "success", data: req.body })
-  })
+  db.query(sql, [values], (err, result) => {
+    if(err) return res.json("Error");
+    const newServiceId = result.insertId;
+    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
+})
 })
 
 app.put("/data/pc/services/:id", (req,res) => {
@@ -556,6 +598,6 @@ app.get('/logout', (req, res) => {
   return res.json({status: "Success"});
 })
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`Example app listening on port ${PORT}`);
 });
