@@ -7,13 +7,16 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import path from 'path';
-import bodyParser from 'body-parser';
+import { fileURLToPath } from 'url';
+import {body, validationResult} from 'express-validator';
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(cors()); // Enable CORS for all routes
-app.use(bodyParser.json());
-const PORT = process.env.PORT || 8082;
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const port = 8081;
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -34,6 +37,11 @@ const db = mysql2.createConnection({
   database: "serfix"
 });
 
+app.use('/uploads', (req, res, next) => {
+  console.log(`Serving static file: ${req.url}`);
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
+
 app.post('/uploadbukti', upload.single('image'), (req, res) => {
   console.log("Received a request to /uploadbukti");
   console.log("File info:", req.file);
@@ -42,9 +50,10 @@ app.post('/uploadbukti', upload.single('image'), (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
   }
 
+  const { service_id } = req.body;
   const image = req.file.filename;
-  const sql = "INSERT INTO bukti (image) VALUES (?)";
-  db.query(sql, [image], (err, result) => {
+  const sql = "UPDATE service SET image = ? WHERE id = ?";
+  db.query(sql, [image, service_id], (err, result) => {
       if (err) {
           console.error("Error inserting image:", err);
           return res.status(500).json({ error: "Error inserting image" });
@@ -97,9 +106,10 @@ app.post('/LoginScreen', (req, res) => {
                   const email = data[0].email;
                   const name = data[0].username;
                   const phone = data[0].phone_number;
+                  const role = data[0].role;
                   const token = jwt.sign({email}, "jwtsecretkeyadmin", {expiresIn : '1d'});
                   res.cookie('token', token);
-                  return res.json({ status: 'success', message: 'Login Berhasil', id, token, email, name, phone});
+                  return res.json({ status: 'success', message: 'Login Berhasil', id, token, email, name, phone, role});
               } else {
                   return res.status(401).json({ status: 'error', message: 'Password Salah' });
               }
@@ -136,8 +146,9 @@ app.get("/admin-page/:status", (req, res) => {
     const store = data[0].store;
     const type = data[0].type;
     const username = data[0].iduser;
+    const image = data[0].image;
 
-    res.status(200).json({ status: "success", data, id, device, price, status, start_date, finish, category, store, type, username});
+    res.status(200).json({ status: "success", data, id, device, price, status, start_date, finish, category, store, type, username, image});
   });
 });
 
@@ -469,66 +480,84 @@ app.post("/feedback", (req,res) => {
   })
 })
 
-app.get("/track/:id", (req,res) => {
-  const sql = "SELECT * FROM service WHERE user = id";
+app.get("/track/:id", (req, res) => {
   const id = req.params.id;
-  const device = data[0].device_name;
-  const category = data[0].category;
-  const status = data[0].status;
-  const price = data[0].price;
-  const store = data[0].store;
-  const start_date = data[0].start_date;
-  const type = data[0].type;
-  db.query(sql, [id], (err,data) => {
-      if(err) return res.json("Err");
-      res.status(200).json({ status: "success", data, device, category, status, price, store, start_date, type})
-  })
-})
+  const sql = "SELECT * FROM service WHERE user = ? AND status = 2";
+  db.query(sql, [id], (err, data) => {
+      if (err) {
+          console.error("Error fetching service data:", err);
+          return res.status(500).json({ error: "Internal Server Error" });
+      }
 
-app.get("/history/:id", (req,res) => {
-  const sql = "SELECT * FROM service WHERE user = id";
-  const id = req.params.id;
-  const device = data[0].device_name;
-  const price = data[0].price;
-  const status = data[0].status;
-  const start_date = data[0].start_date;
-  const finish = data[0].finish_date;
-  const category = data[0].category;
-  const store = data[0].store;
-  const type = data[0].type;
-  db.query(sql, [id], (err,data) => {
-      if(err) return res.json("Err");
-      res.status(200).json({ status: "success", data, device, price, status, start_date, finish, category, store, type})
-  })
-})
+      if (data.length === 0) {
+          return res.status(404).json({ error: "No data found for the specified user" });
+      }
 
-app.post("/register", async (req, res) => {
-  try {
-      // Generate salt and hash asynchronously
-      const salt = await bcryptjs.genSalt(12);
-      const hash = await bcryptjs.hash(req.body.password, salt);
-
-      // SQL query with placeholders
-      const sql = "INSERT INTO user (`username`, `password`, `email`, `phone_number`) VALUES (?)";
-
-      // Values for the placeholders
-      const values = [
-        req.body.username,
-        hash,
-        req.body.email,
-        req.body.phone,
-    ]
-
-      // Execute the query
-      db.query(sql, [values], (err, data) => {
-        if(err) return res.json("Error");
-        res.status(200).json({ status: "success", data: req.body })
-    })
-  } catch (error) {
-      console.error(error);
-      res.json("Error");
-  }
+      res.status(200).json({ status: "success", data });
+  });
 });
+
+
+app.get("/history/:id", (req, res) => {
+  const id = req.params.id;
+  const sql = "SELECT * FROM service WHERE user = ? AND status = 3";
+  db.query(sql, [id], (err, data) => {
+      if (err) {
+          console.error("Error fetching service data:", err);
+          return res.status(500).json({ error: "Internal Server Error" });
+      }
+
+      if (data.length === 0) {
+          return res.status(404).json({ error: "No data found for the specified user" });
+      }
+
+      res.status(200).json({ status: "success", data });
+  });
+});
+
+app.post('/register',
+  body('username').isLength({ min: 6 }).withMessage('Username must be at least 6 characters long'),
+  body('email').isEmail().withMessage('Email must be in email format'),
+  body('phone').isNumeric().withMessage('Phone number must contain only numbers'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ status: 'error', message: 'Validation errors', errors: errors.array() });
+    }
+
+    const { username, email, phone, password } = req.body;
+
+    try {
+      const checkEmailSql = "SELECT email FROM user WHERE email = ?";
+      db.query(checkEmailSql, [email], async (err, results) => {
+        if (err) {
+          return res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+        }
+
+        if (results.length > 0) {
+          return res.status(400).json({ status: 'error', message: 'Email already exists' });
+        }
+
+        const salt = await bcrypt.genSalt(12);
+        const hash = await bcrypt.hash(password, salt);
+
+        const sql = "INSERT INTO user (`username`, `password`, `email`, `phone_number`, `role`) VALUES (?)";
+        const role = "user";
+        const values = [username, hash, email, phone, role];
+
+        db.query(sql, [values], (err, data) => {
+          if (err) return res.status(500).json({ status: 'error', message: 'Database Error' });
+          res.status(200).json({ status: 'success', data: req.body });
+        });
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+    }
+  }
+);
+
 
 app.post("/user", (req,res) => {
   const sql = "INSERT INTO user (`username`, `password`, `email`, `phone_number`) VALUES (?)";
@@ -598,6 +627,6 @@ app.get('/logout', (req, res) => {
   return res.json({status: "Success"});
 })
 
-app.listen(PORT, () => {
-  console.log(`Example app listening on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`);
 });
