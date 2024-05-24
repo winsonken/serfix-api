@@ -256,7 +256,7 @@ app.post("/data/laptop/services", (req,res) => {
   db.query(sql, [values], (err, result) => {
       if(err) return res.json("Error");
       const newServiceId = result.insertId;
-      res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
+      res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type, device:req.body.device, notes:req.body.notes })
   })
 })
 
@@ -342,7 +342,7 @@ app.post("/data/phone/services", (req,res) => {
     const price1 = result.price;
     const category1 = result.category1;
     const type1 = result.type;
-    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
+    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type, device : req.body.device, notes : req.body.notes })
 })
 })
 
@@ -425,7 +425,7 @@ app.post("/data/pc/services", (req,res) => {
   db.query(sql, [values], (err, result) => {
     if(err) return res.json("Error");
     const newServiceId = result.insertId;
-    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
+    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type, device : req.body.device, notes : req.body.notes })
 })
 })
 
