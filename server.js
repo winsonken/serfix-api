@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(cors()); // Enable CORS for all routes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-const port = 8081;
+const port = 8082;
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -152,19 +152,22 @@ app.get("/admin-page/:status", (req, res) => {
   });
 });
 
-app.put("/admin-page-ongoing/:id", (req,res) => {
+app.put("/admin-page-ongoing/:id", (req, res) => {
   const id = req.params.id;
-  const sql = "UPDATE service SET `status` = 3 WHERE id = ?";
+  const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const status = 3;
+  const sql = "UPDATE service SET `status` = ?, `finish_date` = ? WHERE id = ?";
 
-  db.query(sql, [id], (err, data) => {
+  db.query(sql, [status, currentDate, id], (err, data) => {
       if (err) {
           console.error(err); // Log the error for debugging 
           return res.status(500).json({ error: "Internal Server Error" });
       }
-      console.log(id)
-      res.status(200).json({ status: "success", data: req.body })
-  })
-})
+      console.log(id);
+      res.status(200).json({ status: "success", data: req.body });
+  });
+});
+
 
 app.put("/admin-page-accept/:id", (req,res) => {
   const id = req.params.id;
