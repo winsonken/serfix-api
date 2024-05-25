@@ -5,8 +5,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "dev": "nodemon --env-file=.env server.js",
+    "dev2": "node --watch --env-file=.env server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon server.js"
+    "start": "node server.js"
   },
   "author": "",
   "license": "ISC",

@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(cors()); // Enable CORS for all routes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-const port = 8082;
+const port = process.env.PORT;
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -29,12 +29,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-
 const db = mysql2.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "serfix"
+  host: process.env.HOST,
+  user: process.env.USER,
+  password: process.env.PASSWORD,
+  database: process.env.DATABASE,
 });
 
 app.use('/uploads', (req, res, next) => {
