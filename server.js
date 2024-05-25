@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import mysql2 from "mysql2";
+import mysql2 from "mysql2";  
 import moment from 'moment';
 import bcryptjs from 'bcryptjs';
 import bcrypt from 'bcrypt';
@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(cors()); // Enable CORS for all routes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-const port = 8082;
+const port = process.env.PORT;
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -29,12 +29,37 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-
 const db = mysql2.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "serfix"
+  host: process.env.HOST,
+  user: process.env.USER,
+  password: process.env.PASSWORD,
+  database: process.env.DATABASE,
+});
+
+app.use('/uploads', (req, res, next) => {
+  console.log(`Serving static file: ${req.url}`);
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
+
+app.post('/uploadbukti', upload.single('image'), (req, res) => {
+  console.log("Received a request to /uploadbukti");
+  console.log("File info:", req.file);
+
+  if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+  }
+
+  const { service_id } = req.body;
+  const image = req.file.filename;
+  const sql = "UPDATE service SET image = ? WHERE id = ?";
+  db.query(sql, [image, service_id], (err, result) => {
+      if (err) {
+          console.error("Error inserting image:", err);
+          return res.status(500).json({ error: "Error inserting image" });
+      }
+      console.log("Image inserted successfully:", result);
+      return res.status(200).json({ status: "Success" });
+  });
 });
 
 app.use('/uploads', (req, res, next) => {
@@ -256,7 +281,7 @@ app.post("/data/laptop/services", (req,res) => {
   db.query(sql, [values], (err, result) => {
       if(err) return res.json("Error");
       const newServiceId = result.insertId;
-      res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
+      res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type, device:req.body.device, notes:req.body.notes })
   })
 })
 
@@ -342,7 +367,7 @@ app.post("/data/phone/services", (req,res) => {
     const price1 = result.price;
     const category1 = result.category1;
     const type1 = result.type;
-    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
+    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type, device : req.body.device, notes : req.body.notes })
 })
 })
 
@@ -425,7 +450,7 @@ app.post("/data/pc/services", (req,res) => {
   db.query(sql, [values], (err, result) => {
     if(err) return res.json("Error");
     const newServiceId = result.insertId;
-    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type })
+    res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type, device : req.body.device, notes : req.body.notes })
 })
 })
 
