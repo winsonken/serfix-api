@@ -260,11 +260,16 @@ app.get("/data/laptop/price", (req, res) => {
   });
 });
 
-app.post("/data/laptop/services", (req,res) => {
+app.post("/data/laptop/services", upload.single('image'), (req, res) => {
   const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ");
-  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`, `type`, `user`, `iduser`, `start_date`) VALUES (?)";
+  console.log("File info:", req.file);
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  
+  }
+  const sql = "INSERT INTO service (`device_name`, `category`, `store`, `price`, `notes`, `status`, `type`, `user`, `iduser`, `start_date`, `image`) VALUES (?)";
+  const image = req.file.filename;
   const status = 1
-  const type = "Laptop"
   const values = [
       req.body.device,
       req.body.category1,
@@ -272,16 +277,19 @@ app.post("/data/laptop/services", (req,res) => {
       req.body.price,
       req.body.notes,
       status,
-      type,
+      req.body.type,
       req.body.id,
       req.body.username,
       currentDate,
-
+      image
   ]
   db.query(sql, [values], (err, result) => {
-      if(err) return res.json("Error");
+      if(err) {
+        console.error('Error inserting data into the database:', err);
+        return res.status(500).json({ error: 'An internal server error occurred' });
+      }
       const newServiceId = result.insertId;
-      res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, type: type, device:req.body.device, notes:req.body.notes })
+      res.status(200).json({ status: "success", data: req.body, id: newServiceId, price: req.body.price, category: req.body.category1, device:req.body.device, notes:req.body.notes, location:req.body.selectedLocation, user:req.body.username})
   })
 })
 
@@ -508,10 +516,11 @@ app.post("/feedback", (req,res) => {
   })
 })
 
-app.get("/track/:id", (req, res) => {
+app.get("/track/:id/:status", (req, res) => {
   const id = req.params.id;
-  const sql = "SELECT * FROM service WHERE user = ? AND status = 2";
-  db.query(sql, [id], (err, data) => {
+  const status = req.params.status;
+  const sql = "SELECT * FROM service WHERE user = ? AND status = ?";
+  db.query(sql, [id, status], (err, data) => {
       if (err) {
           console.error("Error fetching service data:", err);
           return res.status(500).json({ error: "Internal Server Error" });
